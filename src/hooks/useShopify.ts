@@ -1,5 +1,5 @@
 import {createShopifyClient, PRODUCT_FRAGMENT} from "@/lib/shopify.ts";
-import {QueryClient, useQuery} from "@tanstack/react-query";
+import {useQuery} from "@tanstack/react-query";
 import type {Product} from "@/types/shopify.ts";
 
 const SHOP_DOMAIN = import.meta.env.VITE_SHOP_DOMAIN
@@ -52,7 +52,7 @@ export const useProduct = (handle: string) => {
     })
 };
 
-export const useProductByType = (productType: string. first = 20) => {
+export const useProductByType = (productType: string, first = 20) => {
     return useQuery({
         queryKey: ['productsByType', productType, first],
         queryFn: async () => {
@@ -73,6 +73,7 @@ export const useProductByType = (productType: string. first = 20) => {
                 query: `product_type:${productType}`,
                 first
             });
+            // @ts-ignore
             return data.products.edges.map((edge: any) => edge.node) as Product[];
         },
         enabled: !!productType,
@@ -115,6 +116,7 @@ export const useCollections = (first = 10) => {
       `;
 
             const data = await client.request(query, { first });
+            // @ts-ignore
             return data.collections.edges.map((edge: any) => edge.node);
         },
     });
@@ -152,7 +154,7 @@ export const useCollectionProducts = (handle: string, first = 20) => {
 
             const data = await client.request(query, { handle, first });
 
-            // Structurer les données de retour
+            // @ts-ignore
             const collection = data.collection;
             collection.products = collection.products.edges.map((edge: any) => edge.node);
 
@@ -183,6 +185,7 @@ export const useSearchProducts = (searchTerm: string, first = 20) => {
                 query: searchTerm,
                 first
             });
+            // @ts-ignore
             return data.products.edges.map((edge: any) => edge.node) as Product[];
         },
         enabled: !!searchTerm && searchTerm.length > 2,
