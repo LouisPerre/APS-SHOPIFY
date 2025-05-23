@@ -1,5 +1,5 @@
 import {createShopifyClient, PRODUCT_FRAGMENT} from "@/lib/shopify.ts";
-import {useQuery} from "@tanstack/react-query";
+import {QueryClient, useMutation, useQuery} from "@tanstack/react-query";
 import type {Product} from "@/types/shopify.ts";
 
 const SHOP_DOMAIN = import.meta.env.VITE_SHOP_DOMAIN
@@ -191,3 +191,130 @@ export const useSearchProducts = (searchTerm: string, first = 20) => {
         enabled: !!searchTerm && searchTerm.length > 2,
     });
 };
+
+export const useCreateCart = () => {
+    const queryClient = new QueryClient();
+
+    return useMutation({
+        mutationFn: async () => {
+            const mutation = `
+                mutation CreateCart {
+                    cartCreate {
+                        cart {
+                            id
+                            checkoutUrl
+                        }
+                    }
+                }
+            `;
+
+            const data = await client.request(mutation);
+            // @ts-ignore
+            return data.cartCreate.cart;
+        },
+        onSuccess: (data) => {
+            localStorage.setItem('cartId', data.id);
+            queryClient.invalidateQueries({ queryKey: ['cart'] });
+        },
+    });
+};
+
+export const useCart = () => {
+    const cartId = localStorage.getItem('cartId');
+
+    return useQuery({
+        queryKey: ['cart', cartId],
+        queryFn: async () => {
+            if (!cartId) return null;
+
+            const query = `
+                query GetCart($cartId: ID!) {
+                  cart(id: $cartId) {
+                    id
+                    lines(first: 100) {
+                      edges {
+                        node {
+                          id
+                          quantity
+                          merchandise {
+                            ... on ProductVariant {
+                              id
+                              title
+                              image {
+                                url
+                                altText
+                              }
+                              price {
+                                amount
+                                currencyCode
+                              }
+                              product {
+                                title
+                                handle
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    estimatedCost {
+                      totalAmount {
+                        amount
+                        currencyCode
+                      }
+                    }
+                    checkoutUrl
+                  }
+                }
+            `;
+
+            const data = await client.request(query, { cartId });
+            // @ts-ignore
+            return data.cart;
+        },
+        enabled: !!cartId,
+    });
+};
+
+export const useAddToCart = () => {
+    const queryClient = new QueryClient();
+    const createCart = useCreateCart();
+
+    return useMutation({
+        mutationFn: async ({ variantId, quantity }: { variantId: string; quantity: number }) => {
+            let cartId = localStorage.getItem('cartId');
+
+            if (!cartId) {
+                const newCart = await createCart.mutateAsync();
+                cartId = newCart.id;
+            }
+
+            const mutation = `
+                mutation AddToCart($cartId: ID!, $lines: [CartLineInput!]!) {
+                  cartLinesAdd(cartId: $cartId, lines: $lines) {
+                    cart {
+                      id
+                    }
+                  }
+                }
+            `;
+
+            const variables = {
+                cartId,
+                lines: [
+                    {
+                        quantity,
+                        merchandiseId: variantId,
+                    },
+                ],
+            };
+
+            const data = await client.request(mutation, variables);
+            // @ts-ignore
+            return data.cartLinesAdd.cart;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['cart'] });
+        }
+    })
+}
