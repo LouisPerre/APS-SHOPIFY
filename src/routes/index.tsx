@@ -6,9 +6,19 @@ import {
 } from '@tanstack/react-router';
 import App from '../App';
 import Products from "@/pages/Products.tsx";
+import {AuthContext, useAuthProvider} from "@/hooks/useAuth.ts";
+import ProductPage from "@/pages/ProductPage.tsx";
+import SearchPage from "@/pages/SearchPage.tsx";
 
 const rootRoute = new RootRoute({
-    component: App,
+    component: () => {
+        const auth = useAuthProvider();
+        return (
+            <AuthContext.Provider value={auth}>
+                <App />
+            </AuthContext.Provider>
+        );
+    },
 });
 
 const homeRoute = new Route({
@@ -17,10 +27,27 @@ const homeRoute = new Route({
     component: () => <Products />,
 });
 
+const productsRoute = new Route({
+    getParentRoute: () => rootRoute,
+    path: '/products',
+    component: Products
+})
+
 const productRoute = new Route({
     getParentRoute: () => rootRoute,
     path: '/products/$handle',
-    component: () => <div>Page produit</div>,
+    component: ProductPage,
+});
+
+const searchRoute = new Route({
+    getParentRoute: () => rootRoute,
+    path: '/search',
+    component: SearchPage,
+    validateSearch: (search: Record<string, unknown>) => {
+        return {
+            q: search.q as string,
+        };
+    },
 });
 
 const collectionRoute = new Route({
@@ -38,7 +65,9 @@ const cartRoute = new Route({
 // Enregistrez les routes
 const routeTree = rootRoute.addChildren([
     homeRoute,
+    productsRoute,
     productRoute,
+    searchRoute,
     collectionRoute,
     cartRoute,
 ]);
