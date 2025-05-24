@@ -9,6 +9,7 @@ import Products from "@/pages/Products.tsx";
 import {AuthContext, useAuthProvider} from "@/hooks/useAuth.ts";
 import ProductPage from "@/pages/ProductPage.tsx";
 import SearchPage from "@/pages/SearchPage.tsx";
+import Home from "@/pages/Home.tsx";
 
 const rootRoute = new RootRoute({
     component: () => {
@@ -24,7 +25,7 @@ const rootRoute = new RootRoute({
 const homeRoute = new Route({
     getParentRoute: () => rootRoute,
     path: '/',
-    component: () => <Products />,
+    component: Home,
 });
 
 const productsRoute = new Route({

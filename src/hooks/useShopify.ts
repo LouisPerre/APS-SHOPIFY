@@ -318,3 +318,124 @@ export const useAddToCart = () => {
         }
     })
 }
+
+export const useRemoveFromCart = () => {
+    const queryClient = new QueryClient();
+
+    return useMutation({
+        mutationFn: async (lineId: string) => {
+            const cartId = localStorage.getItem('cartId');
+            if (!cartId) throw new Error('Aucun panier trouvé');
+
+            const mutation = `
+                mutation RemoveFromCart($cartId: ID!, $lineIds: [ID!]!) {
+                  cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
+                    cart {
+                      id
+                    }
+                  }
+                }
+            `;
+
+            const data = await client.request(mutation, {
+                cartId,
+                lineIds: [lineId],
+            });
+
+            // @ts-ignore
+            return data.cartLinesRemove.cart;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['cart'] });
+        }
+    })
+};
+
+export const useUpdateCartLine = () => {
+    const queryClient = new QueryClient();
+
+    return useMutation({
+        mutationFn: async ({ lineId, quantity }: { lineId: string; quantity: number }) => {
+            const cartId = localStorage.getItem('cartId');
+            if (!cartId) throw new Error('Aucun panier trouvé');
+
+            const mutation = `
+                mutation UpdateCartLine($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
+                  cartLinesUpdate(cartId: $cartId, lines: $lines) {
+                    cart {
+                      id
+                    }
+                  }
+                }
+            `;
+
+            const data = await client.request(mutation, {
+                cartId,
+                lines: [{ id: lineId, quantity }],
+            });
+
+            // @ts-ignore
+            return data.cartLinesUpdate.cart;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['cart'] });
+        }
+    })
+}
+
+export const useClearCart = () => {
+    const queryClient = new QueryClient();
+
+    return useMutation({
+        mutationFn: async () => {
+            const cartId = localStorage.getItem('cartId');
+            if (!cartId) return;
+
+            const { data: cart } = await queryClient.fetchQuery({
+                queryKey: ['cart', cartId],
+                queryFn: async () => {
+                    const query = `
+                        query GetCart($cartId: ID!) {
+                          cart(id: $cartId) {
+                            lines(first: 100) {
+                              edges {
+                                node {
+                                  id
+                                }
+                              }
+                            }
+                          }
+                        }
+                    `;
+
+                    const data = await client.request(query, { cartId });
+
+                    // @ts-ignore
+                    return data.cart;
+                }
+            });
+
+            if (cart?.lines?.edges?.length > 0) {
+                const lineIds = cart.lines.edges.map((edge: any) => edge.node.id);
+
+                const mutation = `
+                  mutation RemoveAllFromCart($cartId: ID!, $lineIds: [ID!]!) {
+                    cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
+                      cart {
+                        id
+                      }
+                    }
+                  }
+                `;
+
+                const data = await client.request(mutation, { cartId, lineIds });
+
+                //@ts-ignore
+                return data.cartLinesRemove.cart;
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['cart'] });
+        }
+    })
+}
